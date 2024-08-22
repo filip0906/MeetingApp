@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.11.35208.52
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BlazorMeetingApp", "BlazorMeetingApp\BlazorMeetingApp.csproj", "{CE316905-8151-4652-9874-9EB43F776FD9}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MeetingApi", "MeetingApi\MeetingApi.csproj", "{40265E46-2A6F-4D7B-A411-B7A422800A76}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CE316905-8151-4652-9874-9EB43F776FD9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CE316905-8151-4652-9874-9EB43F776FD9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CE316905-8151-4652-9874-9EB43F776FD9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CE316905-8151-4652-9874-9EB43F776FD9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{40265E46-2A6F-4D7B-A411-B7A422800A76}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{40265E46-2A6F-4D7B-A411-B7A422800A76}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{40265E46-2A6F-4D7B-A411-B7A422800A76}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{40265E46-2A6F-4D7B-A411-B7A422800A76}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {A903AEB6-0227-497B-8BFD-9CB17C714EB5}
+	EndGlobalSection
+EndGlobal

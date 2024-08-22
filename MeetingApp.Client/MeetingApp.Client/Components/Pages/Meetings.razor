@@ -1,0 +1,106 @@
+﻿@page "/meetings"
+@using MeetingApp.Client.Services
+@using MeetingApp.API.Model
+@inject MeetingService MeetingService
+
+<h3>Meetings</h3>
+
+<ul>
+    @foreach (var meeting in meetings)
+    {
+        <li>@meeting.Title on @meeting.Date</li>
+    }
+</ul>
+
+<button @onclick="ShowCreateMeetingForm">Create Meeting</button>
+
+
+
+@if (isCreatingMeeting)
+{
+    <EditForm Model="newMeeting" OnValidSubmit="CreateMeeting">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div>
+            <label>Title:</label>
+            <InputText @bind-Value="newMeeting.Title" />
+        </div>
+        <div>
+            <label>Date:</label>
+            <InputDate @bind-Value="newMeeting.Date" />
+        </div>
+        <div>
+            <label>Participants:</label>
+            <InputText @bind-Value="participants" />
+            <p>(Separate emails with a comma)</p>
+        </div>
+        <button type="submit">Submit</button>
+        <button type="button" @onclick="CancelCreation">Cancel</button>
+    </EditForm>
+}
+
+@code {
+    private List<Meeting> meetings = new List<Meeting>();
+    private bool isCreatingMeeting = false;
+    private Meeting newMeeting = new Meeting();
+    private string participants = string.Empty;
+
+    private void TestMethod()
+    {
+        Console.WriteLine("Test button clicked");
+    }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            meetings = await MeetingService.GetMeetings();
+            Console.WriteLine("Meetings loaded successfully.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading meetings: {ex.Message}");
+        }
+    }
+
+    private void ShowCreateMeetingForm()
+    {
+        Console.WriteLine("ShowCreateMeetingForm called");
+        isCreatingMeeting = true;
+        StateHasChanged();
+    }
+
+    private void CancelCreation()
+    {
+        isCreatingMeeting = false;
+        newMeeting = new Meeting();
+        participants = string.Empty;
+    }
+
+    private async Task CreateMeeting()
+    {
+        Console.WriteLine("CreateMeeting called");
+
+        newMeeting.Participants = participants.Split(',').Select(p => p.Trim()).ToList();
+        meetings.Add(newMeeting);
+
+        // Reset form and hide it
+        newMeeting = new Meeting();
+        participants = string.Empty;
+        isCreatingMeeting = false;
+        // Split participants by comma and trim spaces
+        /*newMeeting.Participants = participants.Split(',')
+            .Select(p => p.Trim())
+            .ToList();
+
+        var createdMeeting = await MeetingService.CreateMeeting(newMeeting);
+        meetings.Add(createdMeeting);
+
+        // Reset form and hide it
+        newMeeting = new Meeting();
+        participants = string.Empty;
+        isCreatingMeeting = false;*/
+    }
+}

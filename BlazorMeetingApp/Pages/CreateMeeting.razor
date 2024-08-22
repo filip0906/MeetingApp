@@ -1,0 +1,77 @@
+﻿@page "/create-meeting"
+@inject IHttpClientFactory ClientFactory
+@inject NavigationManager NavigationManager
+
+<h3>Create a New Meeting</h3>
+
+<EditForm Model="newMeeting" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div>
+        <label>Title:</label>
+        <InputText @bind-Value="newMeeting.Title" />
+    </div>
+
+    <div>
+        <label>Date:</label>
+        <InputDate @bind-Value="newMeeting.Date" />
+    </div>
+
+    <div>
+        <label>Invitees (Email Addresses):</label>
+        <InputText @bind-Value="newInviteeEmail" />
+        <button type="button" @onclick="AddInvitee">Add Email</button>
+    </div>
+
+    <ul>
+        @foreach (var invitee in newMeeting.Invitees)
+        {
+            <li>@invitee</li>
+        }
+    </ul>
+
+    <button type="submit">Create Meeting</button>
+</EditForm>
+
+@code {
+    private Meeting newMeeting = new Meeting();
+    private string newInviteeEmail;
+
+    protected override void OnInitialized()
+    {
+        // Postavljanje inicijalnog datuma na današnji datum
+        newMeeting.Date = DateTime.Today;
+    }
+
+    private void AddInvitee()
+    {
+        if (!string.IsNullOrEmpty(newInviteeEmail))
+        {
+            newMeeting.Invitees.Add(newInviteeEmail);
+            newInviteeEmail = string.Empty;
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        var client = ClientFactory.CreateClient("MeetingApi");
+        var response = await client.PostAsJsonAsync("api/meetings", newMeeting);
+
+        if (response.IsSuccessStatusCode)
+        {
+            NavigationManager.NavigateTo("/meetings");
+        }
+        else
+        {
+            // Handle error response
+        }
+    }
+
+    public class Meeting
+    {
+        public string Title { get; set; }
+        public DateTime Date { get; set; }
+        public List<string> Invitees { get; set; } = new List<string>();
+    }
+}

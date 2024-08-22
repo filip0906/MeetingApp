@@ -1,0 +1,71 @@
+﻿@page "/meetings"
+@inject IHttpClientFactory ClientFactory
+@inject NavigationManager NavigationManager
+
+<h3>Meetings</h3>
+
+@if (meetings == null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (!meetings.Any())
+{
+    <p>No meetings found.</p>
+}
+else
+{
+    <ul>
+        @foreach (var meeting in meetings)
+        {
+            <li>
+                @meeting.Title - @meeting.Date.ToShortDateString()
+                <ul>
+                    @foreach (var invitee in meeting.Invitees)
+                    {
+                        <li>@invitee</li>
+                    }
+                </ul>
+                <button @onclick="() => EditMeeting(meeting.Id)">Edit</button>
+                <button @onclick="() => DeleteMeeting(meeting.Id)">Delete</button>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private List<Meeting>? meetings;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var client = ClientFactory.CreateClient("MeetingApi");
+        meetings = await client.GetFromJsonAsync<List<Meeting>>("api/meetings");
+    }
+
+    private void EditMeeting(int id)
+    {
+        NavigationManager.NavigateTo($"/edit-meeting/{id}");
+    }
+
+    private async Task DeleteMeeting(int id)
+    {
+        var client = ClientFactory.CreateClient("MeetingApi");
+        var response = await client.DeleteAsync($"api/meetings/{id}");
+
+        if (response.IsSuccessStatusCode)
+        {
+            meetings = await client.GetFromJsonAsync<List<Meeting>>("api/meetings");
+        }
+        else
+        {
+            // Handle error response
+        }
+    }
+
+    public class Meeting
+    {
+        public int Id { get; set; }
+        public string Title { get; set; }
+        public DateTime Date { get; set; }
+        public List<string> Invitees { get; set; } = new List<string>();
+    }
+}

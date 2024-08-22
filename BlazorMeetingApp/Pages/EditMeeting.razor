@@ -1,0 +1,95 @@
+﻿@page "/edit-meeting/{id:int}"
+@inject IHttpClientFactory ClientFactory
+@inject NavigationManager NavigationManager
+
+<h3>Edit Meeting</h3>
+
+@if (meeting == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <EditForm Model="meeting" OnValidSubmit="HandleValidSubmit">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div>
+            <label>Title:</label>
+            <InputText @bind-Value="meeting.Title" />
+        </div>
+
+        <div>
+            <label>Date:</label>
+            <InputDate @bind-Value="meeting.Date" />
+        </div>
+
+        <div>
+            <label>Invitees (Email Addresses):</label>
+            <InputText @bind-Value="newInviteeEmail" />
+            <button type="button" @onclick="AddInvitee">Add Email</button>
+        </div>
+
+        <ul>
+            @foreach (var invitee in meeting.Invitees)
+            {
+                <li>
+                    @invitee 
+                    <button type="button" @onclick="() => RemoveInvitee(invitee)">Remove</button>
+                </li>
+            }
+        </ul>
+
+        <button type="submit">Save Changes</button>
+    </EditForm>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private Meeting? meeting;
+    private string newInviteeEmail;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var client = ClientFactory.CreateClient("MeetingApi");
+        meeting = await client.GetFromJsonAsync<Meeting>($"api/meetings/{Id}");
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        var client = ClientFactory.CreateClient("MeetingApi");
+        var response = await client.PutAsJsonAsync($"api/meetings/{Id}", meeting);
+
+        if (response.IsSuccessStatusCode)
+        {
+            NavigationManager.NavigateTo("/meetings");
+        }
+        else
+        {
+            // Handle error response
+        }
+    }
+
+    private void AddInvitee()
+    {
+        if (!string.IsNullOrEmpty(newInviteeEmail))
+        {
+            meeting.Invitees.Add(newInviteeEmail);
+            newInviteeEmail = string.Empty;
+        }
+    }
+
+    private void RemoveInvitee(string invitee)
+    {
+        meeting.Invitees.Remove(invitee);
+    }
+    public class Meeting
+    {
+        public int Id { get; set; }
+        public string Title { get; set; }
+        public DateTime Date { get; set; }
+        public List<string> Invitees { get; set; } = new List<string>();
+    }
+}
