@@ -1,39 +1,78 @@
-using MeetingApi.Data;
-using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Net;
+using System.Net.Mail;
+using System.Text;
+using MeetingApi.Services;
 using Microsoft.EntityFrameworkCore;
+using MeetingApi.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Dodavanje EF Core-a i konekcijskog stringa za bazu podataka
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-builder.Services.AddDbContext<MyDbContext>(options =>
+
+// Registracija AppDbContext
+builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(connectionString));
 
-builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = true)
-    .AddEntityFrameworkStores<MyDbContext>();
 
-// Add services to the container.
-
-builder.Services.AddControllers();
-
-// Define CORS policy
-builder.Services.AddCors(options =>
+// Dodavanje JWT autentifikacije
+builder.Services.AddAuthentication(options =>
 {
-    options.AddPolicy("AllowBlazorClient",
-        builder =>
-        {
-            builder.WithOrigins("https://localhost:7158") // Zameni URL-om Blazor aplikacije
-                   .AllowAnyMethod()
-                   .AllowAnyHeader();
-        });
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = "your-issuer",
+        ValidAudience = "your-audience",
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("your-secret-key"))
+    };
 });
 
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+// Omoguæavanje sesija
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
+
+// Uèitavanje SMTP konfiguracije iz appsettings.json
+var smtpConfig = builder.Configuration.GetSection("Smtp");
+builder.Services.AddSingleton(sp => new SmtpClient(smtpConfig["Host"])
+{
+    Port = int.Parse(smtpConfig["Port"]),
+    Credentials = new NetworkCredential(smtpConfig["User"], smtpConfig["Password"]),
+    EnableSsl = bool.Parse(smtpConfig["EnableSsl"]),
+});
+
+// Registracija servisa
+builder.Services.AddSingleton<IEmailService, EmailService>();
+
+builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowBlazorClient", policy =>
+    {
+        policy.WithOrigins("https://localhost:7158")
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -41,12 +80,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
-// Enable CORS
 app.UseCors("AllowBlazorClient");
 
+// Autorizacija i autentifikacija
+app.UseSession();
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-
 app.Run();

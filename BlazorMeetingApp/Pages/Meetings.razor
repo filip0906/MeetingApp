@@ -18,15 +18,20 @@ else
         @foreach (var meeting in meetings)
         {
             <li>
-                @meeting.Title - @meeting.Date.ToShortDateString()
+                <strong>@meeting.Title</strong> - @meeting.Description <br />
+                @meeting.Date.ToShortDateString() @meeting.Time <br />
+                <strong>Invitees:</strong>
                 <ul>
                     @foreach (var invitee in meeting.Invitees)
                     {
-                        <li>@invitee</li>
+                        <li>
+                            @invitee.Email - @invitee.Status
+                        </li>
                     }
                 </ul>
-                <button @onclick="() => EditMeeting(meeting.Id)">Edit</button>
-                <button @onclick="() => DeleteMeeting(meeting.Id)">Delete</button>
+
+                <button @onclick="() => EditMeeting(meeting.Id)" class="btn btn-primary btn-sm">Edit</button>
+                <button @onclick="() => DeleteMeeting(meeting.Id)" class="btn btn-danger btn-sm">Delete</button>
             </li>
         }
     </ul>
@@ -38,7 +43,15 @@ else
     protected override async Task OnInitializedAsync()
     {
         var client = ClientFactory.CreateClient("MeetingApi");
-        meetings = await client.GetFromJsonAsync<List<Meeting>>("api/meetings");
+
+        try
+        {
+            meetings = await client.GetFromJsonAsync<List<Meeting>>("api/meetings");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading meetings: {ex.Message}");
+        }
     }
 
     private void EditMeeting(int id)
@@ -53,19 +66,37 @@ else
 
         if (response.IsSuccessStatusCode)
         {
+            // Reload the list of meetings after successful deletion
             meetings = await client.GetFromJsonAsync<List<Meeting>>("api/meetings");
         }
         else
         {
-            // Handle error response
+            Console.WriteLine("Error deleting the meeting.");
         }
     }
 
     public class Meeting
     {
-        public int Id { get; set; }
+        public int Id { get; set; }  // Id je neophodan za identifikaciju sastanka
+        public string OrganizerEmail { get; set; }
         public string Title { get; set; }
+        public string Description { get; set; }
         public DateTime Date { get; set; }
-        public List<string> Invitees { get; set; } = new List<string>();
+        public string Time { get; set; }  // Vreme kao string
+        public List<Invitee> Invitees { get; set; } = new List<Invitee>();  // Promjena na listu objekata Invitee
     }
+
+    public class Invitee
+    {
+        public string Email { get; set; }
+        public InvitationStatus Status { get; set; } = InvitationStatus.Pending; // Dodaj ovo svojstvo
+    }
+
+    public enum InvitationStatus
+    {
+        Accepted,
+        Declined,
+        Pending
+    }
+
 }

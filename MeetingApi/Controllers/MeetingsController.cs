@@ -1,7 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using MeetingApi.Models;
-using System.Collections.Generic;
-using System.Linq;
+using MeetingApi.Services;
+using MeetingApi.Data;
 
 namespace MeetingApi.Controllers
 {
@@ -9,20 +10,26 @@ namespace MeetingApi.Controllers
     [ApiController]
     public class MeetingsController : ControllerBase
     {
-        private static List<Meeting> meetings = new List<Meeting>();
+        private readonly AppDbContext _context;
+        private readonly IEmailService _emailService;
 
-        // Get all meetings
-        [HttpGet]
-        public IActionResult GetAll()
+        public MeetingsController(AppDbContext context, IEmailService emailService)
         {
+            _context = context;
+            _emailService = emailService;
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            var meetings = await _context.Meetings.Include(m => m.Invitees).ToListAsync();
             return Ok(meetings);
         }
 
-        // Get meeting by ID
         [HttpGet("{id}")]
-        public IActionResult GetById(int id)
+        public async Task<IActionResult> GetById(int id)
         {
-            var meeting = meetings.FirstOrDefault(m => m.Id == id);
+            var meeting = await _context.Meetings.Include(m => m.Invitees).FirstOrDefaultAsync(m => m.Id == id);
             if (meeting == null)
             {
                 return NotFound();
@@ -30,44 +37,119 @@ namespace MeetingApi.Controllers
             return Ok(meeting);
         }
 
-        // Create a new meeting
         [HttpPost]
-        public IActionResult Create(Meeting meeting)
+        public async Task<IActionResult> Create(Meeting meeting)
         {
-            meeting.Id = meetings.Count + 1;
-            meetings.Add(meeting);
+            // Dodavanje sastanka u bazu
+            _context.Meetings.Add(meeting);
+            await _context.SaveChangesAsync();
+
+            // Slanje e-mail pozivnica
+            await SendEmailInvitations(meeting);
+
             return CreatedAtAction(nameof(GetById), new { id = meeting.Id }, meeting);
         }
 
-        // Update an existing meeting
-        [HttpPut("{id}")]
-        public IActionResult Update(int id, Meeting meeting)
+        [HttpGet("accept-invitation/{meetingId}/{inviteeEmail}")]
+        public async Task<IActionResult> AcceptInvitation(int meetingId, string inviteeEmail)
         {
-            var existingMeeting = meetings.FirstOrDefault(m => m.Id == id);
+            var meeting = await _context.Meetings.Include(m => m.Invitees).FirstOrDefaultAsync(m => m.Id == meetingId);
+            if (meeting == null)
+            {
+                return NotFound();
+            }
+
+            var invitee = meeting.Invitees.FirstOrDefault(i => i.Email == inviteeEmail);
+            if (invitee == null)
+            {
+                return NotFound();
+            }
+
+            invitee.Status = InvitationStatus.Accepted;
+            await _context.SaveChangesAsync();
+            return Ok("Dolazak je potvrđen.");
+        }
+
+        [HttpGet("decline-invitation/{meetingId}/{inviteeEmail}")]
+        public async Task<IActionResult> DeclineInvitation(int meetingId, string inviteeEmail)
+        {
+            var meeting = await _context.Meetings.Include(m => m.Invitees).FirstOrDefaultAsync(m => m.Id == meetingId);
+            if (meeting == null)
+            {
+                return NotFound();
+            }
+
+            var invitee = meeting.Invitees.FirstOrDefault(i => i.Email == inviteeEmail);
+            if (invitee == null)
+            {
+                return NotFound();
+            }
+
+            invitee.Status = InvitationStatus.Declined;
+            await _context.SaveChangesAsync();
+            return Ok("Poziv je odbijen.");
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, Meeting meeting)
+        {
+            var existingMeeting = await _context.Meetings.Include(m => m.Invitees).FirstOrDefaultAsync(m => m.Id == id);
             if (existingMeeting == null)
             {
                 return NotFound();
             }
 
             existingMeeting.Title = meeting.Title;
+            existingMeeting.Description = meeting.Description;
             existingMeeting.Date = meeting.Date;
-            existingMeeting.Invitees = meeting.Invitees; // Update the invitees list
+            existingMeeting.Time = meeting.Time;
+            existingMeeting.Invitees = meeting.Invitees;
+
+            await _context.SaveChangesAsync();
+
+            // Ponovno slanje e-mail pozivnica nakon izmene sastanka
+            await SendEmailInvitations(existingMeeting);
 
             return NoContent();
         }
 
-        // Delete a meeting
         [HttpDelete("{id}")]
-        public IActionResult Delete(int id)
+        public async Task<IActionResult> Delete(int id)
         {
-            var meeting = meetings.FirstOrDefault(m => m.Id == id);
+            var meeting = await _context.Meetings.Include(m => m.Invitees).FirstOrDefaultAsync(m => m.Id == id);
             if (meeting == null)
             {
                 return NotFound();
             }
 
-            meetings.Remove(meeting);
+            _context.Meetings.Remove(meeting);
+            await _context.SaveChangesAsync();
             return NoContent();
+        }
+
+        private async Task SendEmailInvitations(Meeting meeting)
+        {
+            var baseUrl = $"{Request.Scheme}://{Request.Host}/"; // Generiraj bazni URL iz HttpRequest objekta
+
+            foreach (var invitee in meeting.Invitees)
+            {
+                var acceptUrl = $"{baseUrl}api/meetings/accept-invitation/{meeting.Id}/{invitee.Email}";
+                var declineUrl = $"{baseUrl}api/meetings/decline-invitation/{meeting.Id}/{invitee.Email}";
+
+                var emailBody = $"You are invited to the meeting titled \"{meeting.Title}\" on {meeting.Date.ToShortDateString()} at {meeting.Time}.<br/>" +
+                                $"Description: {meeting.Description}<br/>" +
+                                $"<a href='{acceptUrl}'>Accept Invitation</a><br/>" +
+                                $"<a href='{declineUrl}'>Decline Invitation</a>";
+
+                try
+                {
+                    await _emailService.SendEmailAsync(invitee.Email, "Meeting Invitation", emailBody, meeting);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error sending email to {invitee.Email}: {ex.Message}");
+                }
+            }
         }
     }
 }

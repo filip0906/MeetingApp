@@ -1,6 +1,7 @@
 ﻿@page "/create-meeting"
 @inject IHttpClientFactory ClientFactory
 @inject NavigationManager NavigationManager
+@using System.ComponentModel.DataAnnotations
 
 <h3>Create a New Meeting</h3>
 
@@ -8,30 +9,51 @@
     <DataAnnotationsValidator />
     <ValidationSummary />
 
-    <div>
+    <div class="form-group">
+        <label>Organizer Email:</label>
+        <InputText @bind-Value="newMeeting.OrganizerEmail" class="form-control" />
+        <ValidationMessage For="@(() => newMeeting.OrganizerEmail)" />
+    </div>
+
+    <div class="form-group">
         <label>Title:</label>
-        <InputText @bind-Value="newMeeting.Title" />
+        <InputText @bind-Value="newMeeting.Title" class="form-control" />
+        <ValidationMessage For="@(() => newMeeting.Title)" />
     </div>
 
-    <div>
+    <div class="form-group">
+        <label>Description:</label>
+        <InputText @bind-Value="newMeeting.Description" class="form-control" />
+        <ValidationMessage For="@(() => newMeeting.Description)" />
+    </div>
+
+    <div class="form-group">
         <label>Date:</label>
-        <InputDate @bind-Value="newMeeting.Date" />
+        <InputDate @bind-Value="newMeeting.Date" class="form-control" />
+        <ValidationMessage For="@(() => newMeeting.Date)" />
     </div>
 
-    <div>
+    <div class="form-group">
+        <label>Time:</label>
+        <InputText @bind-Value="newMeeting.Time" class="form-control" />
+        <ValidationMessage For="@(() => newMeeting.Time)" />
+    </div>
+
+    <div class="form-group">
         <label>Invitees (Email Addresses):</label>
-        <InputText @bind-Value="newInviteeEmail" />
-        <button type="button" @onclick="AddInvitee">Add Email</button>
+        <InputText @bind-Value="newInviteeEmail" class="form-control" />
+        <ValidationMessage For="@(() => newInviteeEmail)" />
+        <button type="button" @onclick="AddInvitee" class="btn btn-secondary mt-2">Add Email</button>
     </div>
 
     <ul>
         @foreach (var invitee in newMeeting.Invitees)
         {
-            <li>@invitee</li>
+            <li>@invitee.Email</li>
         }
     </ul>
 
-    <button type="submit">Create Meeting</button>
+    <button type="submit" class="btn btn-primary">Create Meeting</button>
 </EditForm>
 
 @code {
@@ -40,16 +62,29 @@
 
     protected override void OnInitialized()
     {
-        // Postavljanje inicijalnog datuma na današnji datum
         newMeeting.Date = DateTime.Today;
+        newMeeting.Time = "10:00";
     }
 
     private void AddInvitee()
     {
         if (!string.IsNullOrEmpty(newInviteeEmail))
         {
-            newMeeting.Invitees.Add(newInviteeEmail);
-            newInviteeEmail = string.Empty;
+            var invitee = new Invitee { Email = newInviteeEmail };
+
+            // Provjeravamo ispravnost unosa email-a prije dodavanja
+            var validationContext = new ValidationContext(invitee);
+            var validationResults = new List<ValidationResult>();
+
+            if (Validator.TryValidateObject(invitee, validationContext, validationResults, true))
+            {
+                newMeeting.Invitees.Add(invitee);
+                newInviteeEmail = string.Empty;
+            }
+            else
+            {
+                // Obrada pogrešaka ako email nije valjan (može se prilagoditi za prikaz grešaka)
+            }
         }
     }
 
@@ -64,14 +99,48 @@
         }
         else
         {
-            // Handle error response
+            // Obrada pogreške
         }
     }
 
-    public class Meeting
+    public class Meeting : IValidatableObject
     {
+        [Required(ErrorMessage = "Email organizatora je obavezan.")]
+        [EmailAddress(ErrorMessage = "Neispravna email adresa.")]
+        public string OrganizerEmail { get; set; }
+
+        [Required(ErrorMessage = "Naslov sastanka je obavezan.")]
+        [StringLength(100, ErrorMessage = "Naslov ne smije biti dulji od 100 znakova.")]
         public string Title { get; set; }
+
+        [Required(ErrorMessage = "Opis sastanka je obavezan.")]
+        public string Description { get; set; }
+
+        [Required(ErrorMessage = "Datum sastanka je obavezan.")]
         public DateTime Date { get; set; }
-        public List<string> Invitees { get; set; } = new List<string>();
+
+        [Required(ErrorMessage = "Vrijeme sastanka je obavezno.")]
+        public string Time { get; set; }
+
+        [MinLength(1, ErrorMessage = "Morate pozvati barem jednog sudionika.")]
+        public List<Invitee> Invitees { get; set; } = new List<Invitee>();
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            var currentDateTime = DateTime.Now;
+            var meetingDateTime = Date.Add(TimeSpan.Parse(Time));
+
+            if (meetingDateTime < currentDateTime)
+            {
+                yield return new ValidationResult("Datum i vrijeme sastanka moraju biti u budućnosti.", new[] { nameof(Date), nameof(Time) });
+            }
+        }
+    }
+
+    public class Invitee
+    {
+        [Required(ErrorMessage = "Email sudionika je obavezan.")]
+        [EmailAddress(ErrorMessage = "Neispravna email adresa.")]
+        public string Email { get; set; }
     }
 }
